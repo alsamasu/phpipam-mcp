@@ -24,6 +24,11 @@ interface RequestOptions {
   retryCount?: number;
 }
 
+interface AuthResponseData {
+  token: string;
+  expires?: string;
+}
+
 /**
  * Simple in-memory cache
  */
@@ -99,7 +104,8 @@ export class PhpIpamClient {
       },
     });
     
-    if (!response.success || !response.data?.token) {
+    const authData = response.data as AuthResponseData | undefined;
+    if (!response.success || !authData?.token) {
       throw new PhpIpamError(
         `Authentication failed: ${response.message || 'Unknown error'}`,
         'AUTH',
@@ -107,7 +113,7 @@ export class PhpIpamClient {
       );
     }
     
-    this.authToken = response.data.token;
+    this.authToken = authData.token;
     // Token typically expires in 6 hours, refresh after 5
     this.tokenExpires = Date.now() + (5 * 60 * 60 * 1000);
     

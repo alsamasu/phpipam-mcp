@@ -7,6 +7,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [p
 - **Full IPAM Operations**: List, search, allocate, and release IP addresses
 - **Subnet Management**: View and create subnets with proper CIDR validation
 - **Section Organization**: Manage phpIPAM sections for logical grouping
+- **Dual Authentication**: Supports both API token and username/password authentication
 - **Security First**: Write operations disabled by default with granular toggles
 - **Retry Logic**: Automatic retry with exponential backoff for transient errors
 - **Docker Ready**: Minimal container image with non-root user
@@ -19,8 +20,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [p
 docker run -i --rm \
   -e PHPIPAM_BASE_URL=https://phpipam.example.com \
   -e PHPIPAM_APP_ID=myapp \
-  -e PHPIPAM_USERNAME=admin \
-  -e PHPIPAM_PASSWORD=your-password \
+  -e PHPIPAM_TOKEN=your-api-token \
   mcp/phpipam-mcp
 ```
 
@@ -51,18 +51,35 @@ All configuration is done through environment variables:
 |----------|-------------|---------|
 | `PHPIPAM_BASE_URL` | Base URL of phpIPAM instance | `https://phpipam.example.com` |
 | `PHPIPAM_APP_ID` | API application ID | `myapp` |
-| `PHPIPAM_USERNAME` | phpIPAM username | `admin` |
-| `PHPIPAM_PASSWORD` | phpIPAM password | `your-password` |
 
-### phpIPAM API Setup
+### Authentication
 
-1. Log in to phpIPAM as an administrator
-2. Go to **Administration > API**
-3. Create a new API application:
-   - **App ID**: Choose a name (e.g., `myapp`)
-   - **App Security**: Select **User token**
-   - **App permissions**: Set based on your needs (read/write/admin)
-4. Use the App ID and your phpIPAM credentials with this server
+The server supports two authentication methods. Use `PHPIPAM_AUTH_MODE` to select:
+
+#### Token Authentication (Recommended)
+
+```bash
+PHPIPAM_AUTH_MODE=token
+PHPIPAM_TOKEN=your-api-token
+```
+
+Generate an API token in phpIPAM: Admin > API > Your App > Security > Token
+
+#### Username/Password Authentication
+
+```bash
+PHPIPAM_AUTH_MODE=password
+PHPIPAM_USERNAME=admin
+PHPIPAM_PASSWORD=your-password
+```
+
+#### Auto Mode (Default)
+
+```bash
+PHPIPAM_AUTH_MODE=auto
+# Provide either token OR username/password
+# Token takes precedence if both are provided
+```
 
 ### Feature Toggles
 
@@ -130,8 +147,7 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
         "run", "-i", "--rm",
         "-e", "PHPIPAM_BASE_URL=https://phpipam.example.com",
         "-e", "PHPIPAM_APP_ID=myapp",
-        "-e", "PHPIPAM_USERNAME=admin",
-        "-e", "PHPIPAM_PASSWORD=your-password",
+        "-e", "PHPIPAM_TOKEN=your-token",
         "mcp/phpipam-mcp"
       ]
     }
@@ -150,8 +166,7 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
         "run", "-i", "--rm",
         "-e", "PHPIPAM_BASE_URL=https://phpipam.example.com",
         "-e", "PHPIPAM_APP_ID=myapp",
-        "-e", "PHPIPAM_USERNAME=admin",
-        "-e", "PHPIPAM_PASSWORD=your-password",
+        "-e", "PHPIPAM_TOKEN=your-token",
         "-e", "PHPIPAM_WRITE_ENABLED=true",
         "mcp/phpipam-mcp"
       ]

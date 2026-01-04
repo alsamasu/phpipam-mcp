@@ -2,7 +2,7 @@
  * phpIPAM API Client
  * 
  * Handles all HTTP communication with the phpIPAM API.
- * Supports both token and password authentication.
+ * Uses username/password authentication to obtain session tokens.
  */
 
 import https from 'node:https';
@@ -15,7 +15,6 @@ import {
   Address,
   SearchResult,
 } from './types.js';
-import { getEffectiveAuthMode } from './config.js';
 
 interface RequestOptions {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -75,16 +74,10 @@ export class PhpIpamClient {
   }
   
   /**
-   * Get authentication token (handles both token and password auth)
+   * Get authentication token using username/password
    */
   private async getAuthToken(): Promise<string> {
-    const effectiveMode = getEffectiveAuthMode(this.config);
-    
-    if (effectiveMode === 'token') {
-      return this.config.token!;
-    }
-    
-    // Password authentication - check if we have a valid session token
+    // Check if we have a valid session token
     if (this.authToken && Date.now() < this.tokenExpires) {
       return this.authToken;
     }
