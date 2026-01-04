@@ -239,7 +239,7 @@ async function handleTool(
       return client.listSections();
     
     case 'phpipam.sections.get': {
-      const input = args as unknown as GetSectionInput;
+      const input = args as GetSectionInput;
       if (input.id) {
         return client.getSection(input.id);
       }
@@ -255,15 +255,12 @@ async function handleTool(
     
     // Subnets (Read)
     case 'phpipam.subnets.list': {
-      const input = args as unknown as ListSubnetsInput;
-      if (!input.sectionId) {
-        throw new PhpIpamError('sectionId is required', 'VALIDATION');
-      }
+      const input = args as ListSubnetsInput;
       return client.listSubnets(input.sectionId);
     }
     
     case 'phpipam.subnets.get': {
-      const input = args as unknown as GetSubnetInput;
+      const input = args as GetSubnetInput;
       if (input.id) {
         return client.getSubnet(input.id);
       }
@@ -279,15 +276,12 @@ async function handleTool(
     
     // Addresses (Read)
     case 'phpipam.addresses.list': {
-      const input = args as unknown as ListAddressesInput;
-      if (!input.subnetId) {
-        throw new PhpIpamError('subnetId is required', 'VALIDATION');
-      }
+      const input = args as ListAddressesInput;
       return client.listAddresses(input.subnetId);
     }
     
     case 'phpipam.addresses.get': {
-      const input = args as unknown as GetAddressInput;
+      const input = args as GetAddressInput;
       if (input.id) {
         return client.getAddress(input.id);
       }
@@ -303,10 +297,7 @@ async function handleTool(
     
     // Search
     case 'phpipam.search': {
-      const input = args as unknown as SearchInput;
-      if (!input.query) {
-        throw new PhpIpamError('query is required', 'VALIDATION');
-      }
+      const input = args as SearchInput;
       if (input.type === 'hostname') {
         const addresses = await client.searchByHostname(input.query);
         return { addresses };
@@ -317,10 +308,7 @@ async function handleTool(
     // Addresses (Write)
     case 'phpipam.addresses.allocate': {
       assertWriteEnabled(config, 'addresses.allocate');
-      const input = args as unknown as AllocateAddressInput;
-      if (!input.subnetId) {
-        throw new PhpIpamError('subnetId is required', 'VALIDATION');
-      }
+      const input = args as AllocateAddressInput;
       return client.allocateFirstFree(input.subnetId, {
         hostname: input.hostname,
         description: input.description,
@@ -332,7 +320,7 @@ async function handleTool(
     
     case 'phpipam.addresses.release': {
       assertWriteEnabled(config, 'addresses.release');
-      const input = args as unknown as ReleaseAddressInput;
+      const input = args as ReleaseAddressInput;
       
       let addressId = input.id;
       if (!addressId && input.ip) {
@@ -353,11 +341,7 @@ async function handleTool(
     
     case 'phpipam.addresses.upsert': {
       assertWriteEnabled(config, 'addresses.upsert');
-      const input = args as unknown as UpsertAddressInput;
-      
-      if (!input.ip || !input.subnetId) {
-        throw new PhpIpamError('ip and subnetId are required', 'VALIDATION');
-      }
+      const input = args as UpsertAddressInput;
       
       // Check if address already exists
       const existing = await client.getAddressByIp(input.ip);
@@ -388,11 +372,7 @@ async function handleTool(
     // Subnet Creation
     case 'phpipam.subnets.ensure': {
       assertSubnetCreateEnabled(config);
-      const input = args as unknown as EnsureSubnetInput;
-      
-      if (!input.cidr || !input.sectionId) {
-        throw new PhpIpamError('cidr and sectionId are required', 'VALIDATION');
-      }
+      const input = args as EnsureSubnetInput;
       
       // Check if subnet already exists
       const existing = await client.getSubnetByCidr(input.cidr);
@@ -419,11 +399,7 @@ async function handleTool(
     // Section Creation
     case 'phpipam.sections.ensure': {
       assertSectionCreateEnabled(config);
-      const input = args as unknown as EnsureSectionInput;
-      
-      if (!input.name) {
-        throw new PhpIpamError('name is required', 'VALIDATION');
-      }
+      const input = args as EnsureSectionInput;
       
       // Check if section already exists
       const existing = await client.getSectionByName(input.name);
