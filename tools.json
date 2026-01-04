@@ -1,0 +1,54 @@
+[
+  {
+    "name": "phpipam.health",
+    "description": "Check phpIPAM connectivity and authentication status"
+  },
+  {
+    "name": "phpipam.sections.list",
+    "description": "List all sections in phpIPAM"
+  },
+  {
+    "name": "phpipam.sections.get",
+    "description": "Get a specific section by ID or name"
+  },
+  {
+    "name": "phpipam.subnets.list",
+    "description": "List all subnets in a section"
+  },
+  {
+    "name": "phpipam.subnets.get",
+    "description": "Get a specific subnet by ID or CIDR notation"
+  },
+  {
+    "name": "phpipam.addresses.list",
+    "description": "List all addresses in a subnet"
+  },
+  {
+    "name": "phpipam.addresses.get",
+    "description": "Get a specific address by ID or IP"
+  },
+  {
+    "name": "phpipam.search",
+    "description": "Search for addresses by IP, hostname, or other criteria"
+  },
+  {
+    "name": "phpipam.addresses.allocate",
+    "description": "Allocate the first available IP address in a subnet (requires PHPIPAM_WRITE_ENABLED=true)"
+  },
+  {
+    "name": "phpipam.addresses.release",
+    "description": "Release (delete) an IP address (requires PHPIPAM_WRITE_ENABLED=true)"
+  },
+  {
+    "name": "phpipam.addresses.upsert",
+    "description": "Create or update an IP address (requires PHPIPAM_WRITE_ENABLED=true)"
+  },
+  {
+    "name": "phpipam.subnets.ensure",
+    "description": "Ensure a subnet exists, create if missing (requires PHPIPAM_ALLOW_SUBNET_CREATE=true)"
+  },
+  {
+    "name": "phpipam.sections.ensure",
+    "description": "Ensure a section exists, create if missing (requires PHPIPAM_ALLOW_SECTION_CREATE=true)"
+  }
+]
