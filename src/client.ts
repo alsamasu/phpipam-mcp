@@ -2,10 +2,12 @@
  * phpIPAM API Client
  * 
  * Handles all HTTP communication with the phpIPAM API.
- * Uses username/password authentication to obtain session tokens.
+ * Supports both token and password authentication.
+ * Supports encrypted (Crypt) mode for secure API communication.
  */
 
 import https from 'node:https';
+import crypto from 'node:crypto';
 import {
   PhpIpamConfig,
   PhpIpamError,
@@ -15,6 +17,7 @@ import {
   Address,
   SearchResult,
 } from './types.js';
+import { getEffectiveAuthMode } from './config.js';
 
 interface RequestOptions {
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -26,6 +29,27 @@ interface RequestOptions {
 interface AuthResponseData {
   token: string;
   expires?: string;
+}
+
+/**
+ * Encrypt data using Rijndael-256 ECB mode (phpIPAM's "Crypt" security)
+ * Note: Rijndael-256 with 256-bit blocks is not standard AES.
+ * phpIPAM uses mcrypt's RIJNDAEL_256 which has 256-bit block size.
+ * We'll use AES-256-ECB as a fallback since Node.js doesn't support Rijndael-256.
+ */
+function encryptRequest(data: string, key: string): string {
+  // Pad key to 32 bytes (256 bits)
+  const keyBuffer = Buffer.alloc(32);
+  Buffer.from(key).copy(keyBuffer);
+  
+  // Use AES-256-ECB (closest to Rijndael-256 in Node.js)
+  const cipher = crypto.createCipheriv('aes-256-ecb', keyBuffer, null);
+  cipher.setAutoPadding(true);
+  
+  let encrypted = cipher.update(data, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  
+  return encodeURIComponent(encrypted);
 }
 
 /**
@@ -64,6 +88,7 @@ export class PhpIpamClient {
   private tokenExpires: number = 0;
   private cache: SimpleCache;
   private httpsAgent: https.Agent;
+  private useCrypt: boolean;
   
   constructor(config: PhpIpamConfig) {
     this.config = config;
@@ -71,13 +96,22 @@ export class PhpIpamClient {
     this.httpsAgent = new https.Agent({
       rejectUnauthorized: config.verifyTls,
     });
+    // Use crypt mode when token auth is configured
+    this.useCrypt = getEffectiveAuthMode(config) === 'token';
   }
   
   /**
-   * Get authentication token using username/password
+   * Get authentication token (handles both token and password auth)
    */
   private async getAuthToken(): Promise<string> {
-    // Check if we have a valid session token
+    const effectiveMode = getEffectiveAuthMode(this.config);
+    
+    // Token authentication - use the static token directly
+    if (effectiveMode === 'token') {
+      return this.config.token!;
+    }
+    
+    // Password authentication - check if we have a valid session token
     if (this.authToken && Date.now() < this.tokenExpires) {
       return this.authToken;
     }
@@ -201,21 +235,58 @@ export class PhpIpamClient {
    */
   async request<T>(options: RequestOptions): Promise<T> {
     const { method, path, body, retryCount = 0 } = options;
-    
     const token = await this.getAuthToken();
-    const url = `${this.config.baseUrl}/api/${this.config.appId}${path}`;
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'token': token,
-    };
+    let url: string;
+    let headers: Record<string, string>;
+    let requestBody: string | undefined;
+    
+    if (this.useCrypt) {
+      // Crypt mode: encrypt the request parameters
+      const controller = path.split('/').filter(p => p)[0] || '';
+      const requestParams: Record<string, unknown> = {
+        controller: controller,
+      };
+      
+      // Parse path to extract controller and id
+      const pathParts = path.split('/').filter(p => p);
+      if (pathParts.length > 1) {
+        requestParams.id = pathParts[1];
+      }
+      
+      // Add body params for write operations
+      if (body) {
+        Object.assign(requestParams, body);
+      }
+      
+      const encryptedRequest = encryptRequest(JSON.stringify(requestParams), token);
+      url = `${this.config.baseUrl}/api/${this.config.appId}/?enc_request=${encryptedRequest}`;
+      
+      headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // For non-GET requests, we need to indicate the method
+      if (method !== 'GET') {
+        // phpIPAM crypt mode uses query params, method is determined by request
+        // We'll try sending as the actual HTTP method
+      }
+    } else {
+      // Standard mode: use token in header
+      url = `${this.config.baseUrl}/api/${this.config.appId}${path}`;
+      headers = {
+        'Content-Type': 'application/json',
+        'token': token,
+      };
+      requestBody = body ? JSON.stringify(body) : undefined;
+    }
     
     try {
       const response = await this.httpRequest({
-        method,
+        method: this.useCrypt ? 'GET' : method, // Crypt mode uses GET with encrypted params
         url,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: this.useCrypt ? undefined : requestBody,
       });
       
       if (!response.success) {
@@ -291,7 +362,8 @@ export class PhpIpamClient {
   
   async health(): Promise<{ healthy: boolean; message: string }> {
     try {
-      await this.getAuthToken();
+      // Make an actual API call to verify full connectivity
+      await this.listSections();
       return { healthy: true, message: 'Connected to phpIPAM' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

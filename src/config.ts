@@ -1,11 +1,15 @@
 /**
  * Configuration management for phpIPAM MCP Server
  * 
- * Uses username/password authentication with the phpIPAM API.
- * The server authenticates and obtains a session token automatically.
+ * Supports two authentication modes:
+ * - Token: API token-based authentication (App security = "SSL with App code token")
+ * - Password: Username/password authentication (App security = "User token")
+ * 
+ * Auto mode will detect which credentials are provided and use the appropriate method.
+ * If both are provided, token authentication takes precedence.
  */
 
-import { PhpIpamConfig, PhpIpamError } from './types.js';
+import { PhpIpamConfig, AuthMode, PhpIpamError } from './types.js';
 
 /**
  * Parse boolean from environment variable
@@ -30,8 +34,6 @@ function parseInt(value: string | undefined, defaultValue: number): number {
 export function loadConfig(): PhpIpamConfig {
   const baseUrl = process.env.PHPIPAM_BASE_URL;
   const appId = process.env.PHPIPAM_APP_ID;
-  const username = process.env.PHPIPAM_USERNAME;
-  const password = process.env.PHPIPAM_PASSWORD;
   
   if (!baseUrl) {
     throw new PhpIpamError(
@@ -47,16 +49,19 @@ export function loadConfig(): PhpIpamConfig {
     );
   }
   
-  if (!username || !password) {
-    throw new PhpIpamError(
-      'PHPIPAM_USERNAME and PHPIPAM_PASSWORD are required for authentication',
-      'VALIDATION'
-    );
-  }
+  const authMode = (process.env.PHPIPAM_AUTH_MODE || 'auto') as AuthMode;
+  const token = process.env.PHPIPAM_TOKEN;
+  const username = process.env.PHPIPAM_USERNAME;
+  const password = process.env.PHPIPAM_PASSWORD;
+  
+  // Validate auth configuration
+  validateAuthConfig(authMode, token, username, password);
   
   return {
     baseUrl: baseUrl.replace(/\/$/, ''), // Remove trailing slash
     appId,
+    authMode,
+    token,
     username,
     password,
     
@@ -73,6 +78,68 @@ export function loadConfig(): PhpIpamConfig {
     maxRetries: parseInt(process.env.PHPIPAM_MAX_RETRIES, 3),
     retryDelay: parseInt(process.env.PHPIPAM_RETRY_DELAY, 1000),
   };
+}
+
+/**
+ * Validate authentication configuration
+ */
+function validateAuthConfig(
+  authMode: AuthMode,
+  token?: string,
+  username?: string,
+  password?: string
+): void {
+  const hasToken = Boolean(token);
+  const hasPassword = Boolean(username && password);
+  
+  switch (authMode) {
+    case 'token':
+      if (!hasToken) {
+        throw new PhpIpamError(
+          'PHPIPAM_TOKEN is required when PHPIPAM_AUTH_MODE=token',
+          'VALIDATION'
+        );
+      }
+      break;
+      
+    case 'password':
+      if (!hasPassword) {
+        throw new PhpIpamError(
+          'PHPIPAM_USERNAME and PHPIPAM_PASSWORD are required when PHPIPAM_AUTH_MODE=password',
+          'VALIDATION'
+        );
+      }
+      break;
+      
+    case 'auto':
+      if (!hasToken && !hasPassword) {
+        throw new PhpIpamError(
+          'Authentication credentials required. Provide either:\n' +
+          '  - PHPIPAM_TOKEN for token authentication, or\n' +
+          '  - PHPIPAM_USERNAME and PHPIPAM_PASSWORD for password authentication',
+          'VALIDATION'
+        );
+      }
+      break;
+      
+    default:
+      throw new PhpIpamError(
+        `Invalid PHPIPAM_AUTH_MODE: ${authMode}. Must be 'token', 'password', or 'auto'`,
+        'VALIDATION'
+      );
+  }
+}
+
+/**
+ * Determine the effective authentication mode
+ */
+export function getEffectiveAuthMode(config: PhpIpamConfig): 'token' | 'password' {
+  if (config.authMode === 'token') return 'token';
+  if (config.authMode === 'password') return 'password';
+  
+  // Auto mode: prefer token if available
+  if (config.token) return 'token';
+  return 'password';
 }
 
 /**
@@ -120,8 +187,10 @@ export function maskConfig(config: PhpIpamConfig): Record<string, unknown> {
   return {
     baseUrl: config.baseUrl,
     appId: config.appId,
+    authMode: config.authMode,
+    token: config.token ? '***REDACTED***' : undefined,
     username: config.username,
-    password: '***REDACTED***',
+    password: config.password ? '***REDACTED***' : undefined,
     writeEnabled: config.writeEnabled,
     verifyTls: config.verifyTls,
     enableCache: config.enableCache,

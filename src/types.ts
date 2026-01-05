@@ -6,11 +6,15 @@
 // Configuration Types
 // ============================================================================
 
+export type AuthMode = 'token' | 'password' | 'auto';
+
 export interface PhpIpamConfig {
   baseUrl: string;
   appId: string;
-  username: string;
-  password: string;
+  authMode: AuthMode;
+  token?: string;
+  username?: string;
+  password?: string;
   
   // Feature toggles
   writeEnabled: boolean;
